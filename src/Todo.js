@@ -1,64 +1,55 @@
-import React, { useState, useEffect } from "react";
-import PouchDB from "pouchdb";
-
-const db = new PouchDB("todos");
+import React, { useState } from "react";
 
 const Todo = () => {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState("");
+  const [editingTodoId, setEditingTodoId] = useState(null);
+  const [updatedTodoText, setUpdatedTodoText] = useState("");
 
-  useEffect(() => {
-    // Fetch all todos from the local PouchDB database
-    fetchTodos();
-  }, []);
-
-  const fetchTodos = async () => {
-    try {
-      const result = await db.allDocs({ include_docs: true });
-      const todos = result.rows.map((row) => row.doc);
-      setTodos(todos);
-    } catch (error) {
-      console.error("Error fetching todos:", error);
-    }
-  };
-
-  const addTodo = async (e) => {
+  const addTodo = (e) => {
     e.preventDefault();
     if (newTodo.trim() === "") return;
 
-    try {
-      const todo = {
-        _id: new Date().toISOString(),
-        text: newTodo,
-        completed: false,
-      };
-      await db.put(todo);
-      setNewTodo("");
-      fetchTodos(); // Refresh the todos list after adding a new todo
-    } catch (error) {
-      console.error("Error adding todo:", error);
-    }
+    const todo = {
+      id: Date.now(),
+      text: newTodo,
+      completed: false,
+    };
+
+    setTodos((prevTodos) => [...prevTodos, todo]);
+    setNewTodo("");
   };
 
-  const toggleTodo = async (id) => {
-    try {
-      const todo = await db.get(id);
-      todo.completed = !todo.completed;
-      await db.put(todo);
-      fetchTodos(); // Refresh the todos list after toggling the todo
-    } catch (error) {
-      console.error("Error updating todo:", error);
-    }
+  const startEditing = (id, text) => {
+    setEditingTodoId(id);
+    setUpdatedTodoText(text);
   };
 
-  const deleteTodo = async (id) => {
-    try {
-      const todo = await db.get(id);
-      await db.remove(todo);
-      fetchTodos(); // Refresh the todos list after deleting the todo
-    } catch (error) {
-      console.error("Error deleting todo:", error);
-    }
+  const cancelEditing = () => {
+    setEditingTodoId(null);
+    setUpdatedTodoText("");
+  };
+
+  const updateTodo = (id) => {
+    setTodos((prevTodos) =>
+      prevTodos.map((todo) =>
+        todo.id === id ? { ...todo, text: updatedTodoText } : todo
+      )
+    );
+    setEditingTodoId(null);
+    setUpdatedTodoText("");
+  };
+
+  const toggleTodo = (id) => {
+    setTodos((prevTodos) =>
+      prevTodos.map((todo) =>
+        todo.id === id ? { ...todo, completed: !todo.completed } : todo
+      )
+    );
+  };
+
+  const deleteTodo = (id) => {
+    setTodos((prevTodos) => prevTodos.filter((todo) => todo.id !== id));
   };
 
   return (
@@ -73,14 +64,29 @@ const Todo = () => {
       </form>
       <ul>
         {todos.map((todo) => (
-          <li key={todo._id}>
-            <span
-              style={{ textDecoration: todo.completed ? "line-through" : "none" }}
-              onClick={() => toggleTodo(todo._id)}
-            >
-              {todo.text}
-            </span>
-            <button onClick={() => deleteTodo(todo._id)}>Delete</button>
+          <li key={todo.id}>
+            {editingTodoId === todo.id ? (
+              <div>
+                <input
+                  type="text"
+                  value={updatedTodoText}
+                  onChange={(e) => setUpdatedTodoText(e.target.value)}
+                />
+                <button onClick={() => updateTodo(todo.id)}>Save</button>
+                <button onClick={cancelEditing}>Cancel</button>
+              </div>
+            ) : (
+              <div>
+                <span
+                  style={{ textDecoration: todo.completed ? "line-through" : "none" }}
+                  onClick={() => toggleTodo(todo.id)}
+                >
+                  {todo.text}
+                </span>
+                <button onClick={() => startEditing(todo.id, todo.text)}>Edit</button>
+                <button onClick={() => deleteTodo(todo.id)}>Delete</button>
+              </div>
+            )}
           </li>
         ))}
       </ul>
